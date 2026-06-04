@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "ty-sign"
+version = "0.0.0"
+description = "Telethon auto signin"
+authors = []
+
+[tool.poetry.dependencies]
+python = "^3.10"
+telethon = "^1.36"
+python-dotenv = "^1.0"
+tzdata = "^2026.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
