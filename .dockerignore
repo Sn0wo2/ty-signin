@@ -1,0 +1,17 @@
+.data/
+.env
+.github/
+.git/
+.omo/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+dist/
+tests/
+*.log
+*.py[cod]
+*.session
+*.session-journal
+nul

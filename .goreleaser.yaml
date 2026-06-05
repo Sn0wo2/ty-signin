@@ -1,0 +1,35 @@
+version: 2
+
+project_name: nodeseek-api-signin
+
+builds:
+  - skip: true
+
+release:
+  disable: true
+
+dockers_v2:
+  - id: app
+    dockerfile: Dockerfile
+    images:
+      - ghcr.io/sn0wo2/nodeseek-api-signin
+    tags:
+      - "{{ .Tag }}"
+      - "{{ if not .IsSnapshot }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    extra_files:
+      - pyproject.toml
+      - poetry.lock
+      - main.py
+      - config.py
+    sbom: false
+    flags:
+      - "--provenance=false"
+    annotations:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.name: "{{ .ProjectName }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: "{{ .GitURL }}"
+      org.opencontainers.image.version: "{{ .Version }}"
