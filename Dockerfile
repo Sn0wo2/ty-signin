@@ -23,7 +23,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 WORKDIR /app
 
 COPY --from=deps /app/.venv /app/.venv
-COPY main.py config.py ./
+COPY main.py env.py scheduler.py ./
 
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/.data/session /app/.data/logs \
@@ -33,4 +33,4 @@ USER appuser
 
 VOLUME ["/app/.data"]
 
-CMD ["python", "main.py"]
+CMD ["python", "scheduler.py"]

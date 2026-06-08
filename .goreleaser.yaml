@@ -23,7 +23,8 @@ dockers_v2:
       - pyproject.toml
       - poetry.lock
       - main.py
-      - config.py
+      - env.py
+      - scheduler.py
     sbom: false
     flags:
       - "--provenance=false"
