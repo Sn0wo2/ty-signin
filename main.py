@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("nodeseek-api-signin")
 
-def _name(entity: Any) -> str | None | Any:
+def _name(entity: Any) -> str:
     if isinstance(entity, str):
         return entity
     username = getattr(entity, "username", None)
@@ -34,7 +34,7 @@ def _name(entity: Any) -> str | None | Any:
     return str(getattr(entity, "id", entity))
 
 
-async def _sign(client: TelegramClient, entity: Entity, message: str) -> Any:
+async def _signin(client: TelegramClient, entity: Entity, message: str) -> None:
     label = _name(entity)
     got_reply = asyncio.Event()
 
@@ -63,7 +63,7 @@ async def _sign(client: TelegramClient, entity: Entity, message: str) -> Any:
     finally:
         client.remove_event_handler(_on_reply)
 
-async def _login(client: TelegramClient) -> Any:
+async def _login(client: TelegramClient) -> None:
     if await client.is_user_authorized():
         return
     log.info("Not authorized, starting QR login…")
@@ -153,7 +153,7 @@ async def main() -> None:
                         log.error("[%s] Cannot resolve %r: %s", session_name, parsed_t, e)
                     continue
                 entity = cast(Entity, entity)
-                await _sign(client, entity, msg)
+                await _signin(client, entity, msg)
         finally:
             await client.disconnect()
 

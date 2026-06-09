@@ -106,7 +106,7 @@ def load_tasks() -> list[TaskConfig]:
         task_time = _required_str(item, idx, "time")
         message = _required_str(item, idx, "message")
 
-        _ = parse_time(task_time)
+        parse_time(task_time)
 
         # Strip path traversal elements to keep it in SESSION_DIR safely
         session_file = Path(session).name

@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from env import TZ, TASKS, TaskConfig, parse_time as _parse_sign_time
+from env import TZ, TASKS, TaskConfig, parse_time as _parse_signin_time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,7 +48,7 @@ def main() -> None:
 
         task_runs: list[tuple[TaskConfig, datetime]] = []
         for task in TASKS:
-            hour, minute = _parse_sign_time(task["time"])
+            hour, minute = _parse_signin_time(task["time"])
             nxt = _next_run(now, hour, minute)
             task_runs.append((task, nxt))
 

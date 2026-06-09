@@ -37,7 +37,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         entity = MagicMock(spec=[])
         self.assertEqual(main._name(entity), str(entity))
 
-    async def test_sign_success_with_reply(self):
+    async def test_signin_success_with_reply(self):
         client = AsyncMock()
         client.add_event_handler = MagicMock()
         client.remove_event_handler = MagicMock()
@@ -57,10 +57,10 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
 
         client.add_event_handler.side_effect = add_handler
 
-        async def run_sign():
-            await main._sign(client, entity, message)
+        async def run_signin():
+            await main._signin(client, entity, message)
 
-        task = asyncio.create_task(run_sign())
+        task = asyncio.create_task(run_signin())
         await asyncio.sleep(0.05)
 
         if handler:
@@ -72,7 +72,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         client.send_message.assert_called_once_with(entity, message)
         client.remove_event_handler.assert_called_once()
 
-    async def test_sign_timeout(self):
+    async def test_signin_timeout(self):
         client = AsyncMock()
         client.add_event_handler = MagicMock()
         client.remove_event_handler = MagicMock()
@@ -86,12 +86,12 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         client.send_message = AsyncMock(return_value=sent_msg)
 
         with patch("main.REPLY_TIMEOUT", 0.01):
-            await main._sign(client, entity, message)
+            await main._signin(client, entity, message)
 
         client.send_message.assert_called_once_with(entity, message)
         client.remove_event_handler.assert_called_once()
 
-    async def test_sign_retry_success(self):
+    async def test_signin_retry_success(self):
         client = AsyncMock()
         client.add_event_handler = MagicMock()
         client.remove_event_handler = MagicMock()
@@ -105,7 +105,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         client.send_message = AsyncMock(side_effect=[RPCError(None, "error"), sent_msg])
 
         with patch("main.REPLY_TIMEOUT", 0.01), patch("asyncio.sleep", AsyncMock()) as mock_sleep:
-            await main._sign(client, entity, message)
+            await main._signin(client, entity, message)
 
         self.assertEqual(client.send_message.call_count, 2)
         mock_sleep.assert_called_once_with(1)
@@ -153,7 +153,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
     @patch("main.API_HASH", "hash")
     @patch("main.TelegramClient")
     @patch("main._login", AsyncMock())
-    @patch("main._sign", AsyncMock())
+    @patch("main._signin", AsyncMock())
     async def test_main_login_only(self, mock_client_cls):
         mock_client = AsyncMock()
         mock_client_cls.return_value = mock_client
@@ -181,7 +181,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
     @patch("main.API_HASH", "hash")
     @patch("main.TelegramClient")
     @patch("main._login", AsyncMock())
-    @patch("main._sign", AsyncMock())
+    @patch("main._signin", AsyncMock())
     async def test_main_single_task(self, mock_client_cls):
         mock_client = AsyncMock()
         mock_client_cls.return_value = mock_client
@@ -199,14 +199,14 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.assert_called_once_with("path1", 12345, "hash")
         mock_client.connect.assert_called_once()
         mock_client.get_entity.assert_called_once_with("target1")
-        main._sign.assert_called_once_with(mock_client, "resolved_entity", "msg1")
+        main._signin.assert_called_once_with(mock_client, "resolved_entity", "msg1")
         mock_client.disconnect.assert_called_once()
 
     @patch("main.API_ID", 12345)
     @patch("main.API_HASH", "hash")
     @patch("main.TelegramClient")
     @patch("main._login", AsyncMock())
-    @patch("main._sign", AsyncMock())
+    @patch("main._signin", AsyncMock())
     async def test_main_batch_mode(self, mock_client_cls):
         mock_client = AsyncMock()
         mock_client_cls.return_value = mock_client
@@ -229,7 +229,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.assert_called_once_with("path1", 12345, "hash")
         mock_client.connect.assert_called_once()
         self.assertEqual(mock_client.get_entity.call_count, 2)
-        self.assertEqual(main._sign.call_count, 2)
+        self.assertEqual(main._signin.call_count, 2)
         mock_client.disconnect.assert_called_once()
 
 if __name__ == "__main__":

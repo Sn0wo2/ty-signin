@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from env import _parse_target
 from main import _name
 from scheduler import _next_run
-from env import parse_time as _parse_sign_time
+from env import parse_time as _parse_signin_time
 
 
 class TestParseTarget(unittest.TestCase):
@@ -88,16 +88,16 @@ class TestName(unittest.TestCase):
 
 
 class TestScheduler(unittest.TestCase):
-    def test_parse_sign_time(self):
-        self.assertEqual(_parse_sign_time("08:30"), (8, 30))
+    def test_parse_signin_time(self):
+        self.assertEqual(_parse_signin_time("08:30"), (8, 30))
 
-    def test_parse_sign_time_rejects_bad_format(self):
+    def test_parse_signin_time_rejects_bad_format(self):
         with self.assertRaises(ValueError):
-            _parse_sign_time("8")
+            _parse_signin_time("8")
 
-    def test_parse_sign_time_rejects_invalid_time(self):
+    def test_parse_signin_time_rejects_invalid_time(self):
         with self.assertRaises(ValueError):
-            _parse_sign_time("24:00")
+            _parse_signin_time("24:00")
 
     def test_next_run_today(self):
         now = datetime(2026, 6, 6, 8, 0, 0)
