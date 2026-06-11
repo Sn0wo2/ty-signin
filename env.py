@@ -62,25 +62,6 @@ def parse_time(raw: str) -> tuple[int, int]:
     return hour, minute
 
 
-def _required_value(item: dict[str, object], idx: int, key: str) -> object:
-    if key not in item:
-        raise ValueError(f"Task index {idx} in SIGNIN_CONFIG is missing required field '{key}'")
-    return item[key]
-
-
-def _required_str(item: dict[str, object], idx: int, key: str) -> str:
-    value = _required_value(item, idx, key)
-    if not isinstance(value, str):
-        raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field '{key}' must be a string")
-    return value
-
-
-def _required_target(item: dict[str, object], idx: int) -> TaskTarget:
-    value = _required_value(item, idx, "target")
-    if not isinstance(value, (str, int)):
-        raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field 'target' must be a string or integer")
-    return value
-
 
 def load_tasks() -> list[TaskConfig]:
     raw_config = os.getenv("SIGNIN_CONFIG", "[]")
@@ -101,12 +82,31 @@ def load_tasks() -> list[TaskConfig]:
             raise ValueError(f"Task index {idx} in SIGNIN_CONFIG must be a JSON object")
         item = cast(dict[str, object], raw_item)
 
-        session = _required_str(item, idx, "session")
-        target = _required_target(item, idx)
-        task_time = _required_str(item, idx, "time")
-        message = _required_str(item, idx, "message")
+        if "session" not in item:
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG is missing required field 'session'")
+        session = item["session"]
+        if not isinstance(session, str):
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field 'session' must be a string")
 
-        parse_time(task_time)
+        if "target" not in item:
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG is missing required field 'target'")
+        target = item["target"]
+        if not isinstance(target, (str, int)):
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field 'target' must be a string or integer")
+
+        if "time" not in item:
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG is missing required field 'time'")
+        task_time = item["time"]
+        if not isinstance(task_time, str):
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field 'time' must be a string")
+
+        if "message" not in item:
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG is missing required field 'message'")
+        message = item["message"]
+        if not isinstance(message, str):
+            raise ValueError(f"Task index {idx} in SIGNIN_CONFIG field 'message' must be a string")
+
+        _ = parse_time(task_time)
 
         # Strip path traversal elements to keep it in SESSION_DIR safely
         session_file = Path(session).name
