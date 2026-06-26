@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from env import TZ, TASKS, TaskConfig, parse_time as _parse_signin_time
+from env import TZ, TASKS, TaskConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,6 +13,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("nodeseek-api-signin-scheduler")
+
 
 def _next_run(now: datetime, hour: int, minute: int) -> datetime:
     nxt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -26,9 +27,9 @@ def _run_task(task: TaskConfig) -> int:
     args = [
         sys.executable,
         str(script),
-        "--session-path", task["session_path"],
-        "--target", str(task["target"]),
-        "--message", task["message"]
+        "--session-path", task.session_path,
+        "--target", str(task.target),
+        "--message", task.message
     ]
     return subprocess.run(args, check=False).returncode
 
@@ -41,15 +42,14 @@ def main() -> None:
     log.info("Scheduler started | timezone=%s | total_tasks=%d", TZ, len(TASKS))
     for t in TASKS:
         log.info("  Task: session=%s, target=%s, time=%s, message=%r",
-                 t["session"], t["target"], t["time"], t["message"])
+                 t.session, t.target, t.time, t.message)
 
     while True:
         now = datetime.now(TZ)
 
         task_runs: list[tuple[TaskConfig, datetime]] = []
         for task in TASKS:
-            hour, minute = _parse_signin_time(task["time"])
-            nxt = _next_run(now, hour, minute)
+            nxt = _next_run(now, task.time.hour, task.time.minute)
             task_runs.append((task, nxt))
 
         task_runs.sort(key=lambda x: x[1])
@@ -57,7 +57,7 @@ def main() -> None:
 
         wait = max((earliest_time - now).total_seconds(), 0)
         log.info("Next task [%s -> %s] scheduled at %s (in %.0f seconds)",
-                 earliest_task["session"], earliest_task["target"],
+                 earliest_task.session, earliest_task.target,
                  earliest_time.strftime("%Y-%m-%d %H:%M:%S %Z"), wait)
 
         if wait > 0:
@@ -73,12 +73,12 @@ def main() -> None:
         log.info("Woke up. Due tasks to execute: %d", len(due_tasks))
         # Execute due tasks sequentially to prevent SQLite lock errors on shared session files
         for task in due_tasks:
-            log.info("Executing task: %s -> %s | msg: %r", task["session"], task["target"], task["message"])
+            log.info("Executing task: %s -> %s | msg: %r", task.session, task.target, task.message)
             code = _run_task(task)
             if code:
-                log.error("Task failed (exit code %s): %s -> %s", code, task["session"], task["target"])
+                log.error("Task failed (exit code %s): %s -> %s", code, task.session, task.target)
             else:
-                log.info("Task completed successfully: %s -> %s", task["session"], task["target"])
+                log.info("Task completed successfully: %s -> %s", task.session, task.target)
 
         # Small delay before next tick to avoid tight spin-loop
         time.sleep(2)

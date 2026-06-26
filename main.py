@@ -1,16 +1,17 @@
 import asyncio
 import logging
 import sys
+from collections import defaultdict
+from pathlib import Path
 from typing import Any, cast
+
 from telethon import TelegramClient, events
 from telethon.errors import RPCError, SessionPasswordNeededError
 from telethon.hints import Entity
 
 from env import (
-    API_ID, API_HASH, TZ, REPLY_TIMEOUT, LOG_FILE, TASKS, parse_args, _parse_target
+    API_ID, API_HASH, TZ, REPLY_TIMEOUT, LOG_FILE, TASKS, TaskConfig, parse_args, _parse_target
 )
-from pathlib import Path
-from collections import defaultdict
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,6 +19,7 @@ logging.basicConfig(
     handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("nodeseek-api-signin")
+
 
 def _name(entity: Any) -> str:
     if isinstance(entity, str):
@@ -63,6 +65,7 @@ async def _signin(client: TelegramClient, entity: Entity, message: str) -> None:
     finally:
         client.remove_event_handler(_on_reply)
 
+
 async def _login(client: TelegramClient) -> None:
     if await client.is_user_authorized():
         return
@@ -75,6 +78,50 @@ async def _login(client: TelegramClient) -> None:
     except SessionPasswordNeededError:
         await client.sign_in(password=input("2FA password: ").strip())
 
+
+async def _login_only(tasks: list[TaskConfig]) -> None:
+    unique_sessions = {t.session_path: t.session for t in tasks}
+    log.info("Starting login for %d sessions...", len(unique_sessions))
+    for session_path, session_name in unique_sessions.items():
+        log.info("Logging into session: %s (%s)", session_name, session_path)
+        client = TelegramClient(session_path, API_ID, API_HASH)
+        await client.connect()
+        try:
+            await _login(client)
+            log.info("Successfully authorized session: %s", session_name)
+        finally:
+            await client.disconnect()
+    log.info("All sessions processed.")
+
+
+async def _run_session_group(
+    session_path: str,
+    group_tasks: list[TaskConfig],
+    is_single_task: bool,
+) -> None:
+    session_name = group_tasks[0].session
+    if not is_single_task:
+        log.info("Processing session: %s (%s) with %d tasks", session_name, session_path, len(group_tasks))
+
+    client = TelegramClient(session_path, API_ID, API_HASH)
+    await client.connect()
+    try:
+        await _login(client)
+        for task in group_tasks:
+            try:
+                entity = await client.get_entity(task.parsed_target)
+            except (RPCError, ConnectionError) as e:
+                if is_single_task:
+                    log.error("Cannot resolve %r: %s", task.parsed_target, e)
+                else:
+                    log.error("[%s] Cannot resolve %r: %s", session_name, task.parsed_target, e)
+                continue
+            entity = cast(Entity, entity)
+            await _signin(client, entity, task.message)
+    finally:
+        await client.disconnect()
+
+
 async def main() -> None:
     if not API_ID or not API_HASH:
         log.error("Missing API_ID or API_HASH. Set them in your environment")
@@ -86,78 +133,28 @@ async def main() -> None:
         if not TASKS:
             log.error("No tasks found in SIGNIN_CONFIG. Please configure it first")
             return
-
-        unique_sessions = {}
-        for task in TASKS:
-            unique_sessions[task["session_path"]] = task["session"]
-
-        log.info("Starting login for %d sessions...", len(unique_sessions))
-        for session_path, session_name in unique_sessions.items():
-            log.info("Logging into session: %s (%s)", session_name, session_path)
-            client = TelegramClient(session_path, API_ID, API_HASH)
-            await client.connect()
-            try:
-                await _login(client)
-                log.info("Successfully authorized session: %s", session_name)
-            finally:
-                await client.disconnect()
-        log.info("All sessions processed.")
-        return
+        return await _login_only(TASKS)
 
     if args.session_path and args.target and args.message is not None:
         session_path = args.session_path
-        raw_target = args.target
-        message = args.message
-        parsed_target = _parse_target(raw_target)
-        log.info("Running single task | session: %s | target: %s | message: %r", session_path, raw_target, message)
-
+        log.info("Running single task | session: %s | target: %s | message: %r", session_path, args.target, args.message)
         session_name = Path(session_path).stem
-        session_groups = {
-            session_path: [{
-                "session": session_name,
-                "parsed_target": parsed_target,
-                "message": message
-            }]
-        }
-        is_single_task = True
-    else:
-        if not TASKS:
-            log.error("No tasks configured in SIGNIN_CONFIG")
-            return
+        task = TaskConfig(session=session_name, target=_parse_target(args.target), time="00:00", message=args.message)
+        await _run_session_group(session_path, [task], is_single_task=True)
+        return
 
-        session_groups = defaultdict(list)
-        for task in TASKS:
-            session_groups[task["session_path"]].append(task)
-        log.info("Running all tasks in batch mode...")
-        is_single_task = False
+    if not TASKS:
+        log.error("No tasks configured in SIGNIN_CONFIG")
+        return
 
+    session_groups: dict[str, list[TaskConfig]] = defaultdict(list)
+    for task in TASKS:
+        session_groups[task.session_path].append(task)
+    log.info("Running all tasks in batch mode...")
     for session_path, group_tasks in session_groups.items():
-        session_name = group_tasks[0]["session"]
-        if not is_single_task:
-            log.info("Processing session: %s (%s) with %d tasks", session_name, session_path, len(group_tasks))
+        await _run_session_group(session_path, group_tasks, is_single_task=False)
+    log.info("Batch run completed")
 
-        client = TelegramClient(session_path, API_ID, API_HASH)
 
-        await client.connect()
-        try:
-            await _login(client)
-            for task in group_tasks:
-                parsed_t = task["parsed_target"]
-                msg = task["message"]
-                try:
-                    entity = await client.get_entity(parsed_t)
-                except (RPCError, ConnectionError) as e:
-                    if is_single_task:
-                        log.error("Cannot resolve %r: %s", parsed_t, e)
-                    else:
-                        log.error("[%s] Cannot resolve %r: %s", session_name, parsed_t, e)
-                    continue
-                entity = cast(Entity, entity)
-                await _signin(client, entity, msg)
-        finally:
-            await client.disconnect()
-
-    if not is_single_task:
-        log.info("Batch run completed")
 if __name__ == "__main__":
     asyncio.run(main())
