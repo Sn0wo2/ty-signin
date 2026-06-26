@@ -79,7 +79,6 @@ except ValueError as e:
     sys.stderr.write(f"Configuration Error: {e}\n")
     sys.exit(1)
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Telegram Auto Sign-in parameter parsing")
     parser.add_argument("--login-only", action="store_true", help="Login all configured sessions and exit")

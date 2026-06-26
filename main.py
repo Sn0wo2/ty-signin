@@ -20,7 +20,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("nodeseek-api-signin")
 
-
 def _name(entity: Any) -> str:
     if isinstance(entity, str):
         return entity
