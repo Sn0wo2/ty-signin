@@ -35,14 +35,14 @@ tzdata==2026.3
 Add these variables in QingLong:
 
 ```text
-API_ID=YOUR_TELEGRAM_API_ID
-API_HASH=YOUR_TELEGRAM_API_HASH
-DATA_DIR=/ql/data/ty-sign-data
-TIMEZONE=Asia/Singapore
-REPLY_TIMEOUT=15
+TY_SIGNIN_API_ID=YOUR_TELEGRAM_API_ID
+TY_SIGNIN_API_HASH=YOUR_TELEGRAM_API_HASH
+TY_SIGNIN_DATA_DIR=/ql/data/ty-sign-data
+TY_SIGNIN_TIMEZONE=Asia/Singapore
+TY_SIGNIN_REPLY_TIMEOUT=15
 ```
 
-`SIGNIN_CONFIG` is a JSON array. Each item requires `session`, `target`, and `message`:
+`TY_SIGNIN_CONFIG` is a JSON array. Each item requires `session`, `target`, and `message`:
 
 ```json
 [
@@ -62,9 +62,9 @@ REPLY_TIMEOUT=15
 Optional variables:
 
 ```text
-LOG_FILE=/ql/data/ty-signin-data/logs/ty-signin.log
+TY_SIGNIN_LOG_FILE=/ql/data/ty-signin-data/logs/ty-signin.log
 # Set temporarily when the Telegram account has 2FA enabled.
-TELEGRAM_2FA_PASSWORD=YOUR_TELEGRAM_2FA_PASSWORD
+TY_SIGNIN_2FA_PASSWORD=YOUR_TELEGRAM_2FA_PASSWORD
 ```
 
 ## Authorize sessions
@@ -79,7 +79,7 @@ Schedule: 0 0 1 1 *
 ```
 
 Run `ty-signin-login` manually and follow the QR login instructions in its log. After every session is authorized,
-disable or delete the task. If 2FA is enabled, set `TELEGRAM_2FA_PASSWORD` before running it and remove it after
+disable or delete the task. If 2FA is enabled, set `TY_SIGNIN_2FA_PASSWORD` before running it and remove it after
 authorization. If it is missing, the task exits with an error.
 
 The subscription-created `ty-signin` task runs the regular sign-in flow. Do not add `--login-only` to it.

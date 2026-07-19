@@ -101,9 +101,9 @@ async def _login(client: TelegramClient) -> None:
     try:
         await qr.wait()
     except SessionPasswordNeededError:
-        password = os.getenv("TELEGRAM_2FA_PASSWORD")
+        password = os.getenv("TY_SIGNIN_2FA_PASSWORD")
         if not password:
-            raise RuntimeError("Telegram 2FA is enabled. Set TELEGRAM_2FA_PASSWORD in QingLong.")
+            raise RuntimeError("Telegram 2FA is enabled. Set TY_SIGNIN_2FA_PASSWORD in QingLong.")
         await client.sign_in(password=password)
 
 

@@ -10,15 +10,15 @@ from pydantic import BaseModel, model_validator
 
 load_dotenv()
 
-DATA_DIR = Path(os.getenv("DATA_DIR", ".data"))
-API_ID = int(os.getenv("API_ID", "0"))
-API_HASH = os.getenv("API_HASH", "")
-TZ = ZoneInfo(os.getenv("TIMEZONE", "Asia/Shanghai"))
-REPLY_TIMEOUT = int(os.getenv("REPLY_TIMEOUT", "15"))
+DATA_DIR = Path(os.getenv("TY_SIGNIN_DATA_DIR", ".data"))
+API_ID = int(os.getenv("TY_SIGNIN_API_ID", "0"))
+API_HASH = os.getenv("TY_SIGNIN_API_HASH", "")
+TZ = ZoneInfo(os.getenv("TY_SIGNIN_TIMEZONE", "Asia/Shanghai"))
+REPLY_TIMEOUT = int(os.getenv("TY_SIGNIN_REPLY_TIMEOUT", "15"))
 
 SESSION_DIR = DATA_DIR / "session"
 LOGS_DIR = DATA_DIR / "logs"
-LOG_FILE = os.getenv("LOG_FILE", str(LOGS_DIR / "ty-signin.log"))
+LOG_FILE = os.getenv("TY_SIGNIN_LOG_FILE", str(LOGS_DIR / "ty-signin.log"))
 
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,7 +51,7 @@ class TaskConfig(BaseModel):
         return self
 
 def load_tasks() -> list[TaskConfig]:
-    raw_config = os.getenv("SIGNIN_CONFIG", "[]")
+    raw_config = os.getenv("TY_SIGNIN_CONFIG", "[]")
     if not raw_config.strip():
         raise ValueError("SIGNIN_CONFIG environment variable must not be empty")
 
