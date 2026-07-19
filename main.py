@@ -11,7 +11,7 @@ from telethon import TelegramClient, events
 from telethon.errors import RPCError, SessionPasswordNeededError
 from telethon.hints import Entity
 
-from env import (
+from config import (
     API_HASH,
     API_ID,
     CONFIG_ERROR,
