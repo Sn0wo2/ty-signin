@@ -1,16 +1,27 @@
 import asyncio
 import logging
+import os
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Awaitable, cast
 
 from telethon import TelegramClient, events
 from telethon.errors import RPCError, SessionPasswordNeededError
 from telethon.hints import Entity
 
 from env import (
-    API_ID, API_HASH, TZ, REPLY_TIMEOUT, LOG_FILE, TASKS, TaskConfig, parse_args, _parse_target
+    API_HASH,
+    API_ID,
+    CONFIG_ERROR,
+    LOG_FILE,
+    REPLY_TIMEOUT,
+    TASKS,
+    TZ,
+    TaskConfig,
+    _parse_target,
+    parse_args,
 )
 
 Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
@@ -19,7 +30,19 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
 )
-log = logging.getLogger("nodeseek-api-signin")
+log = logging.getLogger("ty-signin")
+
+
+@dataclass(frozen=True)
+class RunResult:
+    success: bool
+    summary: str
+    details: str = ""
+
+    @property
+    def exit_code(self) -> int:
+        return 0 if self.success else 1
+
 
 def _name(entity: Any) -> str | None | Any:
     if isinstance(entity, str):
@@ -71,14 +94,16 @@ async def _signin(client: TelegramClient, entity: Entity, message: str) -> bool:
 async def _login(client: TelegramClient) -> None:
     if await client.is_user_authorized():
         return
-    log.info("Not authorized, starting QR login…")
+    log.info("Not authorized; starting QR login...")
     qr = await client.qr_login()
-    print(f"\nScan with Telegram:\n>>>  {qr.url}\n")
+    print(f"\nScan this QR code with Telegram:\n{qr.url}\n")
     log.info("QR expires at %s", qr.expires.astimezone(TZ).strftime("%H:%M:%S"))
     try:
         await qr.wait()
     except SessionPasswordNeededError:
-        password = (await asyncio.to_thread(input, "2FA password: ")).strip()
+        password = os.getenv("TELEGRAM_2FA_PASSWORD")
+        if not password:
+            raise RuntimeError("Telegram 2FA is enabled. Set TELEGRAM_2FA_PASSWORD in QingLong.")
         await client.sign_in(password=password)
 
 
@@ -93,14 +118,14 @@ async def _login_only(tasks: list[TaskConfig]) -> None:
             await _login(client)
             log.info("Successfully authorized session: %s", session_name)
         finally:
-            await client.disconnect()
+            await cast(Awaitable[None], client.disconnect())
     log.info("All sessions processed.")
 
 
 async def _run_session_group(
-    session_path: str,
-    group_tasks: list[TaskConfig],
-    is_single_task: bool,
+        session_path: str,
+        group_tasks: list[TaskConfig],
+        is_single_task: bool,
 ) -> bool:
     session_name = group_tasks[0].session
     success = True
@@ -121,49 +146,67 @@ async def _run_session_group(
                     log.exception("[%s] Cannot resolve %r: %s", session_name, task.parsed_target, e)
                 success = False
                 continue
+            if isinstance(entity, list):
+                log.error("[%s] Target %r resolved to multiple entities", session_name, task.parsed_target)
+                success = False
+                continue
             if not await _signin(client, entity, task.message):
                 success = False
     finally:
-        await client.disconnect() # type: ignore[attr-defined]
+        await cast(Awaitable[None], client.disconnect())
     return success
 
 
-async def main() -> int:
-    if not API_ID or not API_HASH:
-        log.error("Missing API_ID or API_HASH. Set them in your environment")
-        return 1
-
+async def main(*, login_only: bool = False) -> RunResult:
     args = parse_args()
 
-    if args.login_only:
+    if CONFIG_ERROR:
+        log.error("Configuration error: %s", CONFIG_ERROR)
+        return RunResult(False, "Configuration error", CONFIG_ERROR)
+
+    if not API_ID or not API_HASH:
+        log.error("Missing API_ID or API_HASH. Set them in your environment")
+        return RunResult(False, "Configuration error", "Missing API_ID or API_HASH")
+
+    if login_only or args.login_only:
         if not TASKS:
             log.error("No tasks found in SIGNIN_CONFIG. Please configure it first")
-            return 1
+            return RunResult(False, "Login failed", "No tasks configured in SIGNIN_CONFIG")
         await _login_only(TASKS)
-        return 0
+        return RunResult(True, "Login complete", f"Authorized sessions: {len({task.session_path for task in TASKS})}")
 
     if args.session_path and args.target and args.message is not None:
         session_path = args.session_path
-        log.info("Running single task | session: %s | target: %s | message: %r", session_path, args.target, args.message)
+        log.info("Running single task | session: %s | target: %s | message: %r", session_path, args.target,
+                 args.message)
         session_name = Path(session_path).stem
         task = TaskConfig(session=session_name, target=_parse_target(args.target), message=args.message)
-        return 0 if await _run_session_group(session_path, [task], is_single_task=True) else 1
+        success = await _run_session_group(session_path, [task], is_single_task=True)
+        return RunResult(
+            success,
+            "Sign-in succeeded" if success else "Sign-in failed",
+            f"Target: {args.target}\nMessage: {args.message}",
+        )
 
     if not TASKS:
         log.error("No tasks configured in SIGNIN_CONFIG")
-        return 1
+        return RunResult(False, "Sign-in failed", "No tasks configured in SIGNIN_CONFIG")
 
     session_groups: dict[str, list[TaskConfig]] = defaultdict(list)
     for task in TASKS:
         session_groups[task.session_path].append(task)
     log.info("Running all tasks in batch mode...")
-    success = True
+    failed_sessions: list[str] = []
     for session_path, group_tasks in session_groups.items():
         if not await _run_session_group(session_path, group_tasks, is_single_task=False):
-            success = False
+            failed_sessions.append(group_tasks[0].session)
     log.info("Batch run completed")
-    return 0 if success else 1
+    success = not failed_sessions
+    details = f"Session groups: {len(session_groups)}\nTasks: {len(TASKS)}"
+    if failed_sessions:
+        details += f"\nFailed sessions: {', '.join(failed_sessions)}"
+    return RunResult(success, "Batch sign-in complete" if success else "Batch sign-in partially failed", details)
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(asyncio.run(main()).exit_code)
