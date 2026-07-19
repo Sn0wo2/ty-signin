@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import sys
 from datetime import time as datetime_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -26,11 +25,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _parse_target(raw: str | int) -> str | int:
-    """
-    Works for users / groups / channels / bots alike:
-      "@name" / "name" / "t.me/name"  -> username
-      "123" / "-1001234567890"        -> peer id
-    """
+    """Normalize Telegram usernames, links, and numeric peer IDs."""
     if isinstance(raw, int):
         return raw
     t = str(raw).strip()
@@ -71,17 +66,19 @@ def load_tasks() -> list[TaskConfig]:
     return [TaskConfig.model_validate(item) for item in tasks]
 
 
+CONFIG_ERROR: str | None = None
 try:
     TASKS = load_tasks()
 except ValueError as e:
-    sys.stderr.write(f"Configuration Error: {e}\n")
-    sys.exit(1)
+    TASKS = []
+    CONFIG_ERROR = str(e)
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Telegram Auto Sign-in parameter parsing")
-    parser.add_argument("--login-only", action="store_true", help="Login all configured sessions and exit")
-    parser.add_argument("--session-path", type=str, help="Telegram session path to run for a specific task")
+    parser = argparse.ArgumentParser(description="Run Telegram sign-in tasks")
+    parser.add_argument("--login-only", action="store_true", help="Authorize all configured sessions and exit")
+    parser.add_argument("--session-path", type=str, help="Session file path for a single task")
     parser.add_argument("--target", type=str,
-                        help="Telegram target entity (numeric ID or username) for a specific task")
-    parser.add_argument("--message", type=str, help="Message to send for a specific task")
+                        help="Target username, link, or numeric ID for a single task")
+    parser.add_argument("--message", type=str, help="Message to send for a single task")
     return parser.parse_args()
