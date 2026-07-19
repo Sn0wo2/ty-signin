@@ -12,7 +12,7 @@ Repository: https://github.com/Sn0wo2/ty-sign.git
 Branch: main
 Schedule: 0 0 * * *
 File suffix: py
-Whitelist: ql_ty_signin.py|ql_ty_signin_login.py|main.py|config.py|pyproject.toml|poetry.lock
+Whitelist: (leave empty)
 Dependency file: leave empty
 ```
 
