@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "nodeseek-api-signin"
+name = "ty-signin"
 version = "0.0.0"
 description = "Telethon auto signin"
 authors = []
