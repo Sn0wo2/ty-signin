@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("nodeseek-api-signin")
 
-def _name(entity: Any) -> str:
+def _name(entity: Any) -> str | None | Any:
     if isinstance(entity, str):
         return entity
     username = getattr(entity, "username", None)
@@ -75,7 +75,7 @@ async def _login(client: TelegramClient) -> None:
     try:
         await qr.wait()
     except SessionPasswordNeededError:
-        await client.sign_in(password=input("2FA password: ").strip())
+        await client.sign_in(password=await asyncio.to_thread(input, "2FA password: ").strip())
 
 
 async def _login_only(tasks: list[TaskConfig]) -> None:
@@ -111,40 +111,39 @@ async def _run_session_group(
                 entity = await client.get_entity(task.parsed_target)
             except (RPCError, ConnectionError) as e:
                 if is_single_task:
-                    log.error("Cannot resolve %r: %s", task.parsed_target, e)
+                    log.exception("Cannot resolve %r: %s", task.parsed_target, e)
                 else:
-                    log.error("[%s] Cannot resolve %r: %s", session_name, task.parsed_target, e)
+                    log.exception("[%s] Cannot resolve %r: %s", session_name, task.parsed_target, e)
                 continue
-            entity = cast(Entity, entity)
             await _signin(client, entity, task.message)
     finally:
-        await client.disconnect()
+        await client.disconnect() # type: ignore[attr-defined]
 
 
 async def main() -> None:
     if not API_ID or not API_HASH:
-        log.error("Missing API_ID or API_HASH. Set them in your environment")
-        return
+        log.exception("Missing API_ID or API_HASH. Set them in your environment")
+        return None
 
     args = parse_args()
 
     if args.login_only:
         if not TASKS:
-            log.error("No tasks found in SIGNIN_CONFIG. Please configure it first")
-            return
+            log.exception("No tasks found in SIGNIN_CONFIG. Please configure it first")
+            return None
         return await _login_only(TASKS)
 
     if args.session_path and args.target and args.message is not None:
         session_path = args.session_path
         log.info("Running single task | session: %s | target: %s | message: %r", session_path, args.target, args.message)
         session_name = Path(session_path).stem
-        task = TaskConfig(session=session_name, target=_parse_target(args.target), time="00:00", message=args.message)
+        task = TaskConfig(session=session_name, target=_parse_target(args.target), time=datetime.strptime("00:00", "%H:%M"), message=args.message)
         await _run_session_group(session_path, [task], is_single_task=True)
-        return
+        return None
 
     if not TASKS:
-        log.error("No tasks configured in SIGNIN_CONFIG")
-        return
+        log.exception("No tasks configured in SIGNIN_CONFIG")
+        return None
 
     session_groups: dict[str, list[TaskConfig]] = defaultdict(list)
     for task in TASKS:
@@ -153,6 +152,7 @@ async def main() -> None:
     for session_path, group_tasks in session_groups.items():
         await _run_session_group(session_path, group_tasks, is_single_task=False)
     log.info("Batch run completed")
+    return None
 
 
 if __name__ == "__main__":

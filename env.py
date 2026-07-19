@@ -55,7 +55,6 @@ class TaskConfig(BaseModel):
         self.parsed_target = _parse_target(self.target)
         return self
 
-
 def load_tasks() -> list[TaskConfig]:
     raw_config = os.getenv("SIGNIN_CONFIG", "[]")
     if not raw_config.strip():
@@ -65,7 +64,6 @@ def load_tasks() -> list[TaskConfig]:
         tasks = json.loads(raw_config)
     except json.JSONDecodeError as e:
         raise ValueError(f"SIGNIN_CONFIG is not a valid JSON: {e}") from e
-
 
     if not isinstance(tasks, list):
         raise ValueError("SIGNIN_CONFIG must be a JSON list of tasks")
