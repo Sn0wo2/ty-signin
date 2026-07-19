@@ -170,8 +170,8 @@ async def main(*, login_only: bool = False) -> RunResult:
 
     if login_only or args.login_only:
         if not TASKS:
-            log.error("No tasks found in SIGNIN_CONFIG. Please configure it first")
-            return RunResult(False, "Login failed", "No tasks configured in SIGNIN_CONFIG")
+            log.error("No tasks found in TY_SIGNIN_CONFIG. Please configure it first")
+            return RunResult(False, "Login failed", "No tasks configured in TY_SIGNIN_CONFIG")
         await _login_only(TASKS)
         return RunResult(True, "Login complete", f"Authorized sessions: {len({task.session_path for task in TASKS})}")
 
@@ -189,8 +189,8 @@ async def main(*, login_only: bool = False) -> RunResult:
         )
 
     if not TASKS:
-        log.error("No tasks configured in SIGNIN_CONFIG")
-        return RunResult(False, "Sign-in failed", "No tasks configured in SIGNIN_CONFIG")
+        log.error("No tasks configured in TY_SIGNIN_CONFIG")
+        return RunResult(False, "Sign-in failed", "No tasks configured in TY_SIGNIN_CONFIG")
 
     session_groups: dict[str, list[TaskConfig]] = defaultdict(list)
     for task in TASKS:

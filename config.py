@@ -53,15 +53,15 @@ class TaskConfig(BaseModel):
 def load_tasks() -> list[TaskConfig]:
     raw_config = os.getenv("TY_SIGNIN_CONFIG", "[]")
     if not raw_config.strip():
-        raise ValueError("SIGNIN_CONFIG environment variable must not be empty")
+        raise ValueError("TY_SIGNIN_CONFIG environment variable must not be empty")
 
     try:
         tasks = json.loads(raw_config)
     except json.JSONDecodeError as e:
-        raise ValueError(f"SIGNIN_CONFIG is not a valid JSON: {e}") from e
+        raise ValueError(f"TY_SIGNIN_CONFIG is not a valid JSON: {e}") from e
 
     if not isinstance(tasks, list):
-        raise ValueError("SIGNIN_CONFIG must be a JSON list of tasks")
+        raise ValueError("TY_SIGNIN_CONFIG must be a JSON list of tasks")
 
     return [TaskConfig.model_validate(item) for item in tasks]
 
