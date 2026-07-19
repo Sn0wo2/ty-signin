@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import time
+from datetime import time as datetime_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -44,7 +44,7 @@ def _parse_target(raw: str | int) -> str | int:
 class TaskConfig(BaseModel):
     session: str
     target: str | int
-    time: time
+    time: datetime_time | None = None
     message: str
     session_path: str = ""
     parsed_target: str | int = ""

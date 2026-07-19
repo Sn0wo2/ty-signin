@@ -13,6 +13,7 @@ from env import (
     API_ID, API_HASH, TZ, REPLY_TIMEOUT, LOG_FILE, TASKS, TaskConfig, parse_args, _parse_target
 )
 
+Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -35,7 +36,7 @@ def _name(entity: Any) -> str | None | Any:
     return str(getattr(entity, "id", entity))
 
 
-async def _signin(client: TelegramClient, entity: Entity, message: str) -> None:
+async def _signin(client: TelegramClient, entity: Entity, message: str) -> bool:
     label = _name(entity)
     got_reply = asyncio.Event()
 
@@ -53,7 +54,7 @@ async def _signin(client: TelegramClient, entity: Entity, message: str) -> None:
                     await asyncio.wait_for(got_reply.wait(), timeout=REPLY_TIMEOUT)
                 except asyncio.TimeoutError:
                     log.info("[%s] no reply (timeout)", label)
-                return
+                return True
             except (RPCError, ConnectionError) as e:
                 if attempt < 2:
                     delay = 2 ** attempt
@@ -61,8 +62,10 @@ async def _signin(client: TelegramClient, entity: Entity, message: str) -> None:
                     await asyncio.sleep(delay)
                 else:
                     log.error("[%s] failed after 3 attempts: %s", label, e)
+                    return False
     finally:
         client.remove_event_handler(_on_reply)
+    return False
 
 
 async def _login(client: TelegramClient) -> None:
@@ -75,7 +78,8 @@ async def _login(client: TelegramClient) -> None:
     try:
         await qr.wait()
     except SessionPasswordNeededError:
-        await client.sign_in(password=await asyncio.to_thread(input, "2FA password: ").strip())
+        password = (await asyncio.to_thread(input, "2FA password: ")).strip()
+        await client.sign_in(password=password)
 
 
 async def _login_only(tasks: list[TaskConfig]) -> None:
@@ -97,8 +101,9 @@ async def _run_session_group(
     session_path: str,
     group_tasks: list[TaskConfig],
     is_single_task: bool,
-) -> None:
+) -> bool:
     session_name = group_tasks[0].session
+    success = True
     if not is_single_task:
         log.info("Processing session: %s (%s) with %d tasks", session_name, session_path, len(group_tasks))
 
@@ -114,46 +119,51 @@ async def _run_session_group(
                     log.exception("Cannot resolve %r: %s", task.parsed_target, e)
                 else:
                     log.exception("[%s] Cannot resolve %r: %s", session_name, task.parsed_target, e)
+                success = False
                 continue
-            await _signin(client, entity, task.message)
+            if not await _signin(client, entity, task.message):
+                success = False
     finally:
         await client.disconnect() # type: ignore[attr-defined]
+    return success
 
 
-async def main() -> None:
+async def main() -> int:
     if not API_ID or not API_HASH:
-        log.exception("Missing API_ID or API_HASH. Set them in your environment")
-        return None
+        log.error("Missing API_ID or API_HASH. Set them in your environment")
+        return 1
 
     args = parse_args()
 
     if args.login_only:
         if not TASKS:
-            log.exception("No tasks found in SIGNIN_CONFIG. Please configure it first")
-            return None
-        return await _login_only(TASKS)
+            log.error("No tasks found in SIGNIN_CONFIG. Please configure it first")
+            return 1
+        await _login_only(TASKS)
+        return 0
 
     if args.session_path and args.target and args.message is not None:
         session_path = args.session_path
         log.info("Running single task | session: %s | target: %s | message: %r", session_path, args.target, args.message)
         session_name = Path(session_path).stem
-        task = TaskConfig(session=session_name, target=_parse_target(args.target), time=datetime.strptime("00:00", "%H:%M"), message=args.message)
-        await _run_session_group(session_path, [task], is_single_task=True)
-        return None
+        task = TaskConfig(session=session_name, target=_parse_target(args.target), message=args.message)
+        return 0 if await _run_session_group(session_path, [task], is_single_task=True) else 1
 
     if not TASKS:
-        log.exception("No tasks configured in SIGNIN_CONFIG")
-        return None
+        log.error("No tasks configured in SIGNIN_CONFIG")
+        return 1
 
     session_groups: dict[str, list[TaskConfig]] = defaultdict(list)
     for task in TASKS:
         session_groups[task.session_path].append(task)
     log.info("Running all tasks in batch mode...")
+    success = True
     for session_path, group_tasks in session_groups.items():
-        await _run_session_group(session_path, group_tasks, is_single_task=False)
+        if not await _run_session_group(session_path, group_tasks, is_single_task=False):
+            success = False
     log.info("Batch run completed")
-    return None
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))
